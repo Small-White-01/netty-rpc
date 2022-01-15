@@ -38,8 +38,10 @@ public class RpcProxyHandler implements InvocationHandler , BeanPostProcessor{
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         Request request = methodMap.get(method);
-
-        return (Response<?>) nettyClient.send(request);
+        request.setParameters(args);
+//        request.setClassName(method.getc);
+        request.setId(UUID.randomUUID().toString());
+        return (Response) nettyClient.send(request);
     }
 
 
@@ -83,8 +85,7 @@ public class RpcProxyHandler implements InvocationHandler , BeanPostProcessor{
             //    request.setMethodName(method.getName());
             //相当于http请求，这里封装了request
             request.setUrl(fullPath);
-            request.setParameters(method.getParameters());
-            request.setId(UUID.randomUUID().toString());
+
             request.setParameterTypes(method.getParameterTypes());
             Class<?> returnType = method.getReturnType();
             boolean isGenericReturnType=true;//返回值是否有泛型

@@ -2,6 +2,8 @@ package com.netty.producer.handler;
 
 import com.rpccommon.demo.annotation.RpcService;
 import com.rpccommon.demo.entity.Request;
+import com.rpccommon.demo.entity.RequestMethod;
+import com.rpccommon.demo.entity.Response;
 import com.rpccommon.demo.util.JSONUtil;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -23,64 +25,90 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 @ChannelHandler.Sharable
 @Component
-public class DispatchHandler extends SimpleChannelInboundHandler<String>
-    implements ApplicationContextAware {
+public class DispatchHandler extends SimpleChannelInboundHandler<String> {
 
-//    @Autowired
-//    private MessageHandlerContainer messageHandlerContainer;
+    @Autowired
+    private MessageHandlerContainer messageHandlerContainer;
 //
-//    @Autowired
-//    private ThreadPoolExecutor threadPoolExecutor;
+    @Autowired
+    private ThreadPoolExecutor threadPoolExecutor;
 
-
+    @Autowired
+    private MessageServiceContainer messageServiceContainer;
 
 
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, String request) throws Exception {
         Request request1 = JSONUtil.DeSerializeToObj(request.toString(), Request.class);
-        String fullPath = request1.getUrl();
+        RequestMethod requestMethod = request1.getRequestMethod();
+        if(requestMethod.equals(RequestMethod.RPC)) {
+            threadPoolExecutor.submit(() -> {
+                Response response = null;
+                response = this.handler(request1);
+                channelHandlerContext.writeAndFlush(response);
+            });
+        }else if(requestMethod.equals(RequestMethod.HEARTBEAT)){
+            String heartBeat = request1.getUrl();
+            MessageHandler messageHandler = messageHandlerContainer.getMessageHandler(heartBeat);
+            threadPoolExecutor.submit(()->{messageHandler.execute(channelHandlerContext,request1);});
+        }
+
+
+
+    }
+    private Response handler(Request request)  {
+        Response.ResponseBuilder responseBuilder=Response.builder();
+        String fullPath = request.getUrl();
         String p= fullPath.substring(1);
         int i = p.indexOf("/");
         String servicePath = fullPath.substring(0, i);
-        Object handler = this.handler(request1);
-        channelHandlerContext.writeAndFlush(handler);
-//        MessageHandler messageHandler = messageHandlerContainer.getMessageHandler(servicePath);
-//        threadPoolExecutor.submit(()->{messageHandler.execute(channelHandlerContext,request1);});
-    }
-    static Map<String, Object> map=new HashMap();
-    private Object handler(Request request) throws Exception {
-        String className = request.getClassName();
-        Object o = map.get(className);
+        Object service = messageServiceContainer.getService(servicePath);
+        if(service==null){
+            responseBuilder.info("service is null")
+                    .code(0);
+            return responseBuilder.build();
+        }
+        String methodName = fullPath.substring(i + 1);
+        Method declaredMethod=null;
+        try {
+             declaredMethod= service.getClass()
+                    .getDeclaredMethod(methodName, request.getParameterTypes());
+        }catch (NoSuchMethodException |SecurityException e){
+            responseBuilder.info(e.getMessage())
+                    .code(0)
+                    .data(null);
+            return responseBuilder.build();
+        }
+        Object[] parameters1 = request.getParameters();
+        if(declaredMethod.getParameterTypes().length!=parameters1.length){
+            responseBuilder.info("paremeters not matches!")
+                    .code(0)
+                    .data(null);
+            return responseBuilder.build();
+        }
+        Object o= null;
+        try {
+            o = declaredMethod.invoke(service, parameters1);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            responseBuilder.exception(e).code(0).info("error");
+            return responseBuilder.build();
+        }
         if(o!=null){
-            Class<?> aClass = o.getClass();
-            String methodName = request.getMethodName();
-            Class<?>[] parameterTypes = request.getParameterTypes();
-            Object[] parameters = request.getParameters();
-            Method declaredMethod = aClass.getDeclaredMethod(methodName, parameterTypes);
-            declaredMethod.setAccessible(true);
-            return declaredMethod.invoke(o,parameters);
-
+            responseBuilder.data(o)
+                    .info("success")
+                    .code(1);
         }else {
-            throw new Exception("no such service");
+            responseBuilder.code(0)
+                    .info("failed")
+                    .data(null);
         }
+        return responseBuilder.build();
 
 
 
     }
 
 
-    @Override
-    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
-        Map<String, Object> beansWithAnnotation = applicationContext.getBeansWithAnnotation(RpcService.class);
-        Collection<Object> values = beansWithAnnotation.values();
-        for (Object clazz:values){
-            Class<?>[] interfaces = clazz.getClass().getInterfaces();
-            for (Class<?> i:interfaces){
-                String simpleName = i.getName();
-                map.put(simpleName,clazz);
-            }
 
-        }
-    }
 }

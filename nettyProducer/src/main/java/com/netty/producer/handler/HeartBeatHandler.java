@@ -12,21 +12,18 @@ import javax.servlet.http.HttpServletRequest;
 
 @CustomMapping("/heartbeat")
 @Slf4j
+//@Component
 public class HeartBeatHandler implements MessageHandler{
     @Override
     public void execute(ChannelHandlerContext ctx, Request request) {
         String info = request.getInfo();
         log.info("收到客户端心跳信息:{}",info);
         String id = request.getId();
-        Response response=new Response();
+        Response response= Response.builder().build();
         response.setCode(1);
         response.setRequestId(id);
         response.setInfo("已收到服务端心跳");
         ctx.writeAndFlush(response);
     }
 
-    @Override
-    public String type() {
-        return "heartBeat";
-    }
 }

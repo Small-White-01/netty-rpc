@@ -46,11 +46,11 @@ public class NettyClient implements InitializingBean {
 
     }
 
-    public Response<?> send(Request request){
+    public Response send(Request request){
         Channel channel = nettyChannelManager.chooseChannel();
         if(channel!=null&&channel.isActive()){
             SynchronousQueue<Object> queue = nettyClientHandler.sendRequest(request,channel);
-            Response<?> result=null;
+            Response result=null;
             try {
                 Object re = queue.take();
                 result= JSONUtil.DeSerializeToObj(re.toString(), Response.class);
@@ -61,7 +61,7 @@ public class NettyClient implements InitializingBean {
             }
             return result;
         }else {
-            Response response=new Response();
+            Response response= Response.builder().build();
             response.setCode(0);
             response.setRequestId(request.getId());
             response.setInfo("\"未正确连接到服务器.请检查相关配置信息!\"");

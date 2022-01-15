@@ -3,6 +3,7 @@ package com.nettyConsumer.demo.client;
 import com.alibaba.fastjson.JSON;
 import com.nettyConsumer.demo.discovery.NettyChannelManager;
 import com.rpccommon.demo.entity.Request;
+import com.rpccommon.demo.entity.RequestMethod;
 import com.rpccommon.demo.entity.Response;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
@@ -54,7 +55,7 @@ public class NettyClientHandler extends ChannelInboundHandlerAdapter {
             IdleStateEvent event = (IdleStateEvent)evt;
             if (event.state()== IdleState.ALL_IDLE){
                 Request request = new Request();
-                request.setMethodName("heartBeat");
+                request.setRequestMethod(RequestMethod.HEARTBEAT);
                 ctx.channel().writeAndFlush(request);
             }
         }else{

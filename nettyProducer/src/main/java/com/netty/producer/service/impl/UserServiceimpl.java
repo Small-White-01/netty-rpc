@@ -2,6 +2,7 @@ package com.netty.producer.service.impl;
 
 import com.netty.producer.service.UserService;
 import com.rpccommon.demo.annotation.RpcService;
+import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
